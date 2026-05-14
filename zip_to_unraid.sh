@@ -38,7 +38,7 @@ ZIP_DIR="/volume1/exams_zip/${MONTH_DIR}"
 REMOTE_DIR="/volume1/remote/backup_DS/${YEAR}/${MONTH_DIR}"
 
 # USB диск (змонтований локально)
-USB_DIR="/volumeUSB1/usbshare/backup/${YEAR}/${MONTH_DIR}"
+USB_DIR="/volumeUSB1/usbshare/MA/${YEAR}/${MONTH_DIR}"
 
 # Логи та база даних
 LOG_DIR="/volume1/scripts/log"
