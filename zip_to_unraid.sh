@@ -2,10 +2,19 @@
 # =============================================================================
 # zip_to_unraid.sh
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
-#               та rsync на Unraid (холодний архів)
+#               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.2
+# Версія      : 2.3
 # =============================================================================
+
+# =============================================================================
+# СЕЛЕКТОР ПРИЗНАЧЕННЯ
+# remote = тільки Unraid
+# usb    = тільки USB диск
+# both   = Unraid + USB
+# =============================================================================
+
+TARGET="both"
 
 # =============================================================================
 # НАЛАШТУВАННЯ — змінювати щомісяця
@@ -27,6 +36,9 @@ ZIP_DIR="/volume1/exams_zip/${MONTH_DIR}"
 
 # Віддалений Unraid (змонтований через NFS/SMB)
 REMOTE_DIR="/volume1/remote/backup_DS/${YEAR}/${MONTH_DIR}"
+
+# USB диск (змонтований локально)
+USB_DIR="/volumeUSB1/usbshare/backup/${YEAR}/${MONTH_DIR}"
 
 # Логи та база даних
 LOG_DIR="/volume1/scripts/log"
@@ -60,7 +72,7 @@ log() {
 
 # Ініціалізація CSV бази якщо не існує
 if [ ! -f "$CSV_FILE" ]; then
-    echo "processed_at,year,month,patient_dir,zip_name,zip_size_bytes,rsync_ok" > "$CSV_FILE"
+    echo "processed_at,year,month,patient_dir,zip_name,zip_size_bytes,rsync_remote_ok,rsync_usb_ok" > "$CSV_FILE"
     log "INFO" "Створено нову базу даних: $CSV_FILE"
 fi
 
@@ -74,9 +86,17 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
-# Перевірити чи існує віддалений шлях
-if [ ! -d "$REMOTE_DIR" ]; then
-    log "WARN" "Віддалена директорія не знайдена: $REMOTE_DIR — rsync буде пропущено"
+# Перевірити доступність призначень
+if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
+    if [ ! -d "$REMOTE_DIR" ]; then
+        log "WARN" "Віддалена директорія не знайдена: $REMOTE_DIR — rsync на Unraid буде пропущено"
+    fi
+fi
+
+if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]]; then
+    if [ ! -d "$USB_DIR" ]; then
+        log "WARN" "USB директорія не знайдена: $USB_DIR — rsync на USB буде пропущено"
+    fi
 fi
 
 # =============================================================================
@@ -99,6 +119,30 @@ file_size() {
     stat -c%s "$1" 2>/dev/null || echo "0"
 }
 
+# Rsync в одне призначення
+do_rsync() {
+    local zip_path="$1"
+    local dest_dir="$2"
+    local label="$3"
+    local zip_name
+    zip_name=$(basename "$zip_path")
+
+    if [ ! -d "$dest_dir" ]; then
+        log "WARN" "Rsync пропущено (${label}) — директорія недоступна: $dest_dir"
+        echo "false"
+        return
+    fi
+
+    rsync -av --checksum "$zip_path" "$dest_dir/" >> "$LOG_FILE" 2>&1
+    if [ $? -eq 0 ]; then
+        log "INFO" "Rsync OK (${label}): $zip_name → $dest_dir"
+        echo "true"
+    else
+        log "ERROR" "Rsync FAILED (${label}): $zip_name"
+        echo "false"
+    fi
+}
+
 # Архівування та копіювання одного пацієнта
 process_patient() {
     local patient_path="$1"
@@ -107,7 +151,8 @@ process_patient() {
     local zip_name
     zip_name="$(sanitize_name "$patient_name").zip"
     local zip_path="${ZIP_DIR}/${zip_name}"
-    local rsync_ok="false"
+    local rsync_remote_ok="false"
+    local rsync_usb_ok="false"
 
     log "INFO" "Обробка: $patient_name"
 
@@ -119,7 +164,7 @@ process_patient() {
 
         if [ $zip_status -ne 0 ]; then
             log "ERROR" "Помилка архівування: $patient_name (код: $zip_status)"
-            rm -f "$zip_path"   # Видалити неповний архів
+            rm -f "$zip_path"
             return 1
         fi
 
@@ -130,26 +175,20 @@ process_patient() {
         log "INFO" "ZIP вже існує: $zip_name — пропускаємо архівування"
     fi
 
-    # --- Rsync на Unraid ---
-    if [ -d "$REMOTE_DIR" ]; then
-        rsync -av --checksum "$zip_path" "$REMOTE_DIR/" >> "$LOG_FILE" 2>&1
-        local rsync_status=$?
+    # --- Rsync згідно з TARGET ---
+    if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
+        rsync_remote_ok=$(do_rsync "$zip_path" "$REMOTE_DIR" "Remote")
+    fi
 
-        if [ $rsync_status -eq 0 ]; then
-            rsync_ok="true"
-            log "INFO" "Rsync OK: $zip_name → $REMOTE_DIR"
-        else
-            log "ERROR" "Rsync FAILED: $zip_name (код: $rsync_status)"
-        fi
-    else
-        log "WARN" "Rsync пропущено — REMOTE_DIR недоступний"
+    if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]]; then
+        rsync_usb_ok=$(do_rsync "$zip_path" "$USB_DIR" "USB")
     fi
 
     # --- Записати в CSV ---
     local zip_size safe_name
     zip_size=$(file_size "$zip_path")
     safe_name="${patient_name//\"/''}"
-    echo "\"$(date '+%Y-%m-%d %H:%M:%S')\",\"${YEAR}\",\"${MONTH}\",\"${safe_name}\",\"${zip_name}\",\"${zip_size}\",\"${rsync_ok}\"" >> "$CSV_FILE"
+    echo "\"$(date '+%Y-%m-%d %H:%M:%S')\",\"${YEAR}\",\"${MONTH}\",\"${safe_name}\",\"${zip_name}\",\"${zip_size}\",\"${rsync_remote_ok}\",\"${rsync_usb_ok}\"" >> "$CSV_FILE"
 
     return 0
 }
@@ -159,10 +198,12 @@ process_patient() {
 # =============================================================================
 
 log "INFO" "========================================================"
-log "INFO" "Запуск скрипту: ${YEAR}/${MONTH_DIR}"
-log "INFO" "Джерело  : $SOURCE_DIR"
-log "INFO" "ZIP сховище : $ZIP_DIR"
-log "INFO" "Unraid   : $REMOTE_DIR"
+log "INFO" "Запуск скрипту : ${YEAR}/${MONTH_DIR}"
+log "INFO" "Призначення    : $TARGET"
+log "INFO" "Джерело        : $SOURCE_DIR"
+log "INFO" "ZIP сховище    : $ZIP_DIR"
+log "INFO" "Unraid         : $REMOTE_DIR"
+log "INFO" "USB            : $USB_DIR"
 log "INFO" "========================================================"
 
 # Знайти всі папки пацієнтів
@@ -195,10 +236,11 @@ done < <(find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
 
 log "INFO" "========================================================"
 log "INFO" "ПІДСУМОК ${YEAR}/${MONTH_DIR}:"
-log "INFO" "  Оброблено нових : $NEW_COUNT"
+log "INFO" "  Призначення      : $TARGET"
+log "INFO" "  Оброблено нових  : $NEW_COUNT"
 log "INFO" "  Пропущено (вже є): $SKIP_COUNT"
-log "INFO" "  Помилок         : $ERROR_COUNT"
-log "INFO" "  База даних      : $CSV_FILE"
+log "INFO" "  Помилок          : $ERROR_COUNT"
+log "INFO" "  База даних       : $CSV_FILE"
 log "INFO" "========================================================"
 
 # Вийти з помилкою якщо були проблеми
