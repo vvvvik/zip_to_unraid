@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.4
+# Версія      : 2.5
 # =============================================================================
 
 # =============================================================================
@@ -104,10 +104,33 @@ fi
 # ФУНКЦІЇ
 # =============================================================================
 
-# Перевірити чи папка вже оброблена (пошук в CSV)
-is_processed() {
+# Перевірити статус пацієнта в CSV відносно поточного TARGET
+# Повертає: 0 = не в базі (повна обробка)
+#           1 = повністю оброблено (пропустити)
+#           2 = ZIP є, але rsync не завершено (повтор rsync)
+patient_status() {
     local patient_dir="$1"
-    grep -qF "\"${patient_dir}\"" "$CSV_FILE" 2>/dev/null
+    local row
+    row=$(grep -F "\"${patient_dir}\"" "$CSV_FILE" 2>/dev/null | tail -1)
+
+    [ -z "$row" ] && return 0  # не в базі
+
+    if [[ "$TARGET" == "onlyZip" ]]; then
+        return 1  # rsync не потрібен
+    fi
+
+    local remote_ok usb_ok
+    remote_ok=$(echo "$row" | cut -d',' -f7 | tr -d '"')
+    usb_ok=$(echo "$row" | cut -d',' -f8 | tr -d '"')
+
+    if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
+        [ "$remote_ok" == "false" ] && return 2
+    fi
+    if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]]; then
+        [ "$usb_ok" == "false" ] && return 2
+    fi
+
+    return 1  # все OK
 }
 
 # Санітизація імені: замінити пробіли, крапки, апострофи на підкреслення
@@ -185,11 +208,19 @@ process_patient() {
         rsync_usb_ok=$(do_rsync "$zip_path" "$USB_DIR" "USB")
     fi
 
-    # --- Записати в CSV ---
+    # --- Записати в CSV (завжди, навіть при помилці rsync) ---
     local zip_size safe_name
     zip_size=$(file_size "$zip_path")
     safe_name="${patient_name//\"/''}"
     echo "\"$(date '+%Y-%m-%d %H:%M:%S')\",\"${YEAR}\",\"${MONTH}\",\"${safe_name}\",\"${zip_name}\",\"${zip_size}\",\"${rsync_remote_ok}\",\"${rsync_usb_ok}\"" >> "$CSV_FILE"
+
+    # Якщо rsync провалився для потрібного призначення — повернути помилку
+    if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]] && [ "$rsync_remote_ok" == "false" ]; then
+        return 1
+    fi
+    if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]] && [ "$rsync_usb_ok" == "false" ]; then
+        return 1
+    fi
 
     return 0
 }
@@ -207,22 +238,34 @@ log "INFO" "Unraid         : $REMOTE_DIR"
 log "INFO" "USB            : $USB_DIR"
 log "INFO" "========================================================"
 
-# Знайти всі папки пацієнтів
 NEW_COUNT=0
+RETRY_COUNT=0
 SKIP_COUNT=0
 ERROR_COUNT=0
 
 while IFS= read -r -d '' patient_path; do
     patient_name=$(basename "$patient_path")
 
-    # Пропустити якщо вже в базі
-    if is_processed "$patient_name"; then
+    patient_status "$patient_name"
+    status=$?
+
+    if [ $status -eq 1 ]; then
         log "INFO" "Вже оброблено: $patient_name"
         (( SKIP_COUNT++ ))
         continue
     fi
 
-    # Обробити пацієнта
+    if [ $status -eq 2 ]; then
+        log "INFO" "Повтор rsync: $patient_name"
+        if process_patient "$patient_path"; then
+            (( RETRY_COUNT++ ))
+        else
+            (( ERROR_COUNT++ ))
+        fi
+        continue
+    fi
+
+    # status=0 — повна обробка
     if process_patient "$patient_path"; then
         (( NEW_COUNT++ ))
     else
@@ -239,6 +282,7 @@ log "INFO" "========================================================"
 log "INFO" "ПІДСУМОК ${YEAR}/${MONTH_DIR}:"
 log "INFO" "  Призначення      : $TARGET"
 log "INFO" "  Оброблено нових  : $NEW_COUNT"
+log "INFO" "  Повтор rsync     : $RETRY_COUNT"
 log "INFO" "  Пропущено (вже є): $SKIP_COUNT"
 log "INFO" "  Помилок          : $ERROR_COUNT"
 log "INFO" "  База даних       : $CSV_FILE"
