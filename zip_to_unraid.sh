@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.6
+# Версія      : 2.7
 # =============================================================================
 
 # =============================================================================
@@ -143,7 +143,7 @@ file_size() {
     stat -c%s "$1" 2>/dev/null || echo "0"
 }
 
-# Rsync в одне призначення
+# Rsync в одне призначення. Повертає: 0=OK, 1=помилка
 do_rsync() {
     local zip_path="$1"
     local dest_dir="$2"
@@ -153,17 +153,16 @@ do_rsync() {
 
     if [ ! -d "$dest_dir" ]; then
         log "WARN" "Rsync пропущено (${label}) — директорія недоступна: $dest_dir"
-        echo "false"
-        return
+        return 1
     fi
 
     rsync -av "$zip_path" "$dest_dir/" >> "$LOG_FILE" 2>&1
     if [ $? -eq 0 ]; then
         log "INFO" "Rsync OK (${label}): $zip_name → $dest_dir"
-        echo "true"
+        return 0
     else
         log "ERROR" "Rsync FAILED (${label}): $zip_name"
-        echo "false"
+        return 1
     fi
 }
 
@@ -201,11 +200,15 @@ process_patient() {
 
     # --- Rsync згідно з TARGET ---
     if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
-        rsync_remote_ok=$(do_rsync "$zip_path" "$REMOTE_DIR" "Remote")
+        if do_rsync "$zip_path" "$REMOTE_DIR" "Remote"; then
+            rsync_remote_ok="true"
+        fi
     fi
 
     if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]]; then
-        rsync_usb_ok=$(do_rsync "$zip_path" "$USB_DIR" "USB")
+        if do_rsync "$zip_path" "$USB_DIR" "USB"; then
+            rsync_usb_ok="true"
+        fi
     fi
 
     # --- Записати в CSV (завжди, навіть при помилці rsync) ---
