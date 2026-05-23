@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.8
+# Версія      : 2.9
 # =============================================================================
 
 # =============================================================================
@@ -36,7 +36,7 @@ SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
 ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
 
 # Віддалений Unraid (змонтований через NFS/SMB)
-REMOTE_DIR="/volume1/remote/backup_DS/${YEAR}/${MONTH_DIR}"
+REMOTE_DIR="/volume1/remotes/Leo_backups/Leo/${YEAR}/${MONTH_DIR}"
 
 # USB диск (змонтований локально)
 USB_DIR="/volumeUSB1/usbshare/MA/${YEAR}/${MONTH_DIR}"
@@ -44,7 +44,6 @@ USB_DIR="/volumeUSB1/usbshare/MA/${YEAR}/${MONTH_DIR}"
 # Логи та база даних
 LOG_DIR="/volume1/scripts/log"
 LOG_FILE="${LOG_DIR}/zip_to_unraid_${YEAR}_${MONTH}.log"
-CSV_FILE="${LOG_DIR}/processed_${YEAR}_${MONTH}.csv"
 
 # =============================================================================
 # НАЛАШТУВАННЯ ZIP
