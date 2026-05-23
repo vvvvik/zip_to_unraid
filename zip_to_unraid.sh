@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.7
+# Версія      : 2.8
 # =============================================================================
 
 # =============================================================================
@@ -33,7 +33,7 @@ MONTH_DIR="05-mis"
 SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
 
 # Локальне сховище ZIP архівів
-ZIP_DIR="/volume1/exams_zip/${MONTH_DIR}"
+ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
 
 # Віддалений Unraid (змонтований через NFS/SMB)
 REMOTE_DIR="/volume1/remote/backup_DS/${YEAR}/${MONTH_DIR}"
