@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.12
+# Версія      : 2.13
 # =============================================================================
 
 # =============================================================================
@@ -87,21 +87,30 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
-# Створити каталоги призначень якщо не існують
+# Перевірити та створити всі каталоги призначень — до початку обробки
+DESTINATIONS_OK=true
+
 if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
     if mkdir -p "$REMOTE_DIR" 2>/dev/null; then
-        log "INFO" "Remote DIR готовий: $REMOTE_DIR"
+        log "INFO" "Remote DIR: OK — $REMOTE_DIR"
     else
-        log "WARN" "Не вдалося створити Remote DIR: $REMOTE_DIR — rsync на Unraid буде пропущено"
+        log "ERROR" "Remote DIR недоступний: $REMOTE_DIR"
+        DESTINATIONS_OK=false
     fi
 fi
 
 if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]]; then
     if mkdir -p "$USB_DIR" 2>/dev/null; then
-        log "INFO" "USB DIR готовий: $USB_DIR"
+        log "INFO" "USB DIR: OK — $USB_DIR"
     else
-        log "WARN" "Не вдалося створити USB DIR: $USB_DIR — rsync на USB буде пропущено"
+        log "ERROR" "USB DIR недоступний: $USB_DIR"
+        DESTINATIONS_OK=false
     fi
+fi
+
+if [ "$DESTINATIONS_OK" = false ]; then
+    log "ERROR" "Не всі призначення доступні. Скрипт зупинено без обробки."
+    exit 1
 fi
 
 # =============================================================================
