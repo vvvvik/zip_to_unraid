@@ -15,28 +15,29 @@
 # both    = Unraid + USB
 # =============================================================================
 
-TARGET="remote"
+TARGET="both"
 
 # =============================================================================
 # НАЛАШТУВАННЯ — змінювати щомісяця
 # =============================================================================
 
 YEAR="2026"
-MONTH="05"
-MONTH_DIR="05-mis"
+MONTH="06"
+MONTH_DIR="06-mis"
 
 # =============================================================================
 # ШЛЯХИ — формуються автоматично з змінних вище
 # =============================================================================
 
 # Джерело: папки пацієнтів з DICOM
-SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
+#SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
+SOURCE_DIR="/volume1/exams24/2026/06-Червень"
 
 # Локальне сховище ZIP архівів
 ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
 
 # Віддалений Unraid (змонтований через NFS/SMB)
-REMOTE_DIR="/volume1/remotes/Leo_backups/Leo/${YEAR}/${MONTH_DIR}"
+REMOTE_DIR="/volume1/remotes/Leo_backups/MA/${YEAR}/${MONTH_DIR}"
 
 # USB диск (змонтований локально)
 USB_DIR="/volumeUSB1/usbshare/MA/${YEAR}/${MONTH_DIR}"
