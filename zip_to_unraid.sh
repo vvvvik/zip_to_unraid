@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.14
+# Версія      : 2.15
 # =============================================================================
 
 # =============================================================================
@@ -158,6 +158,7 @@ file_size() {
 }
 
 # Rsync в одне призначення. Повертає: 0=OK, 1=помилка
+# label="USB" → використовує флаги сумісні з FAT32/exFAT
 do_rsync() {
     local zip_path="$1"
     local dest_dir="$2"
@@ -170,7 +171,11 @@ do_rsync() {
         return 1
     fi
 
-    rsync -av --inplace "$zip_path" "$dest_dir/" >> "$LOG_FILE" 2>&1
+    if [[ "$label" == "USB" ]]; then
+        rsync -rtv --no-perms --no-owner --no-group --no-times "$zip_path" "$dest_dir/" >> "$LOG_FILE" 2>&1
+    else
+        rsync -av "$zip_path" "$dest_dir/" >> "$LOG_FILE" 2>&1
+    fi
     if [ $? -eq 0 ]; then
         log "INFO" "Rsync OK (${label}): $zip_name → $dest_dir"
         return 0
