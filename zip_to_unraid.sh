@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.15
+# Версія      : 2.16
 # =============================================================================
 
 # =============================================================================
@@ -147,6 +147,16 @@ patient_status() {
     return 1  # все OK
 }
 
+# Перевірити чи папка активно пишеться (будь-який файл змінено < 10 хв тому)
+# Повертає: 0=активна (пропустити), 1=безпечна (можна обробляти)
+is_folder_active() {
+    local folder="$1"
+    if find "$folder" -type f -mmin -10 | grep -q .; then
+        return 0
+    fi
+    return 1
+}
+
 # Санітизація імені: замінити пробіли, крапки, апострофи на підкреслення
 sanitize_name() {
     echo "$1" | sed "s/[[:space:]\.'\`]/_/g"
@@ -267,6 +277,13 @@ ERROR_COUNT=0
 
 while IFS= read -r -d '' patient_path; do
     patient_name=$(basename "$patient_path")
+
+    # Перевірка: папка активно пишеться з CT?
+    if is_folder_active "$patient_path"; then
+        log "INFO" "Пропускаємо (запис активний < 10 хв): $patient_name"
+        (( SKIP_COUNT++ ))
+        continue
+    fi
 
     patient_status "$patient_name"
     status=$?
