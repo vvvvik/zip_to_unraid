@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.11
+# Версія      : 2.12
 # =============================================================================
 
 # =============================================================================
@@ -87,16 +87,20 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
-# Перевірити доступність призначень
+# Створити каталоги призначень якщо не існують
 if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
-    if [ ! -d "$REMOTE_DIR" ]; then
-        log "WARN" "Віддалена директорія не знайдена: $REMOTE_DIR — rsync на Unraid буде пропущено"
+    if mkdir -p "$REMOTE_DIR" 2>/dev/null; then
+        log "INFO" "Remote DIR готовий: $REMOTE_DIR"
+    else
+        log "WARN" "Не вдалося створити Remote DIR: $REMOTE_DIR — rsync на Unraid буде пропущено"
     fi
 fi
 
 if [[ "$TARGET" == "usb" || "$TARGET" == "both" ]]; then
-    if [ ! -d "$USB_DIR" ]; then
-        log "WARN" "USB директорія не знайдена: $USB_DIR — rsync на USB буде пропущено"
+    if mkdir -p "$USB_DIR" 2>/dev/null; then
+        log "INFO" "USB DIR готовий: $USB_DIR"
+    else
+        log "WARN" "Не вдалося створити USB DIR: $USB_DIR — rsync на USB буде пропущено"
     fi
 fi
 
