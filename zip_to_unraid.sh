@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.16
+# Версія      : 2.17
 # =============================================================================
 
 # =============================================================================
@@ -36,8 +36,11 @@ SOURCE_DIR="/volume1/exams24/2026/06-Червень"
 # Локальне сховище ZIP архівів
 ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
 
+# Корінь NFS mount point (для перевірки чи шара підключена)
+REMOTE_MOUNT="/volume1/remotes/Leo_backups"
+
 # Віддалений Unraid (змонтований через NFS/SMB)
-REMOTE_DIR="/volume1/remotes/Leo_backups/MA/${YEAR}/${MONTH_DIR}"
+REMOTE_DIR="${REMOTE_MOUNT}/MA/${YEAR}/${MONTH_DIR}"
 
 # USB диск (змонтований локально)
 USB_DIR="/volumeUSB1/usbshare/MA/${YEAR}/${MONTH_DIR}"
@@ -92,7 +95,10 @@ fi
 DESTINATIONS_OK=true
 
 if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
-    if mkdir -p "$REMOTE_DIR" 2>/dev/null; then
+    if ! mountpoint -q "$REMOTE_MOUNT"; then
+        log "ERROR" "NFS шара не змонтована: $REMOTE_MOUNT"
+        DESTINATIONS_OK=false
+    elif mkdir -p "$REMOTE_DIR" 2>/dev/null; then
         log "INFO" "Remote DIR: OK — $REMOTE_DIR"
     else
         log "ERROR" "Remote DIR недоступний: $REMOTE_DIR"
@@ -175,6 +181,12 @@ do_rsync() {
     local label="$3"
     local zip_name
     zip_name=$(basename "$zip_path")
+
+    # Для Remote — перевірити що NFS досі змонтована (могла відвалитися в середині роботи)
+    if [[ "$label" == "Remote" ]] && ! mountpoint -q "$REMOTE_MOUNT"; then
+        log "ERROR" "Rsync FAILED (${label}): NFS шара відвалилася — $REMOTE_MOUNT"
+        return 1
+    fi
 
     if ! mkdir -p "$dest_dir" 2>/dev/null; then
         log "WARN" "Rsync пропущено (${label}) — не вдалося створити директорію: $dest_dir"
