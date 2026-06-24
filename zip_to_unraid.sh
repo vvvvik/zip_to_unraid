@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.17
+# Версія      : 2.18
 # =============================================================================
 
 # =============================================================================
@@ -56,6 +56,11 @@ CSV_FILE="${LOG_DIR}/processed_${YEAR}_${MONTH}.csv"
 
 ZIP_LEVEL=2        # Рівень стиснення (1-9, 2 оптимально для DICOM)
 
+# Перевірити чи шлях є змонтованою точкою (замість відсутньої на DSM команди mountpoint)
+is_mounted() {
+    awk -v mp="$1" '$2==mp{found=1;exit} END{exit !found}' /proc/mounts
+}
+
 # =============================================================================
 # ІНІЦІАЛІЗАЦІЯ
 # =============================================================================
@@ -95,7 +100,7 @@ fi
 DESTINATIONS_OK=true
 
 if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
-    if ! mountpoint -q "$REMOTE_MOUNT"; then
+    if ! is_mounted "$REMOTE_MOUNT"; then
         log "ERROR" "NFS шара не змонтована: $REMOTE_MOUNT"
         DESTINATIONS_OK=false
     elif mkdir -p "$REMOTE_DIR" 2>/dev/null; then
@@ -183,7 +188,7 @@ do_rsync() {
     zip_name=$(basename "$zip_path")
 
     # Для Remote — перевірити що NFS досі змонтована (могла відвалитися в середині роботи)
-    if [[ "$label" == "Remote" ]] && ! mountpoint -q "$REMOTE_MOUNT"; then
+    if [[ "$label" == "Remote" ]] && ! is_mounted "$REMOTE_MOUNT"; then
         log "ERROR" "Rsync FAILED (${label}): NFS шара відвалилася — $REMOTE_MOUNT"
         return 1
     fi
