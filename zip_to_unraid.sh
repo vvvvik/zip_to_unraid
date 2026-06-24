@@ -4,7 +4,7 @@
 # Призначення : Архівування нових папок пацієнтів (DICOM→ZIP)
 #               та rsync на Unraid і/або USB (холодний архів)
 # Автор       : Вік
-# Версія      : 2.18
+# Версія      : 2.19
 # =============================================================================
 
 # =============================================================================
@@ -15,7 +15,7 @@
 # both    = Unraid + USB
 # =============================================================================
 
-TARGET="both"
+TARGET="remote"
 
 # =============================================================================
 # НАЛАШТУВАННЯ — змінювати щомісяця
@@ -30,8 +30,8 @@ MONTH_DIR="06-mis"
 # =============================================================================
 
 # Джерело: папки пацієнтів з DICOM
-#SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
-SOURCE_DIR="/volume1/exams24/2026/06-Червень"
+SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
+#SOURCE_DIR="/volume1/exams24/2026/06-Червень"  # MA (DS920)
 
 # Локальне сховище ZIP архівів
 ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
@@ -40,7 +40,7 @@ ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
 REMOTE_MOUNT="/volume1/remotes/Leo_backups"
 
 # Віддалений Unraid (змонтований через NFS/SMB)
-REMOTE_DIR="${REMOTE_MOUNT}/MA/${YEAR}/${MONTH_DIR}"
+REMOTE_DIR="${REMOTE_MOUNT}/Leo/${YEAR}/${MONTH_DIR}"
 
 # USB диск (змонтований локально)
 USB_DIR="/volumeUSB1/usbshare/MA/${YEAR}/${MONTH_DIR}"
