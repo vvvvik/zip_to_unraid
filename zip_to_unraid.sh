@@ -31,7 +31,7 @@ MONTH_DIR="06-mis"
 
 # Джерело: папки пацієнтів з DICOM
 SOURCE_DIR="/volume1/exams26/SCREENING/${YEAR}/${MONTH_DIR}"
-#SOURCE_DIR="/volume1/exams24/2026/06-Червень"  # MA (DS920)
+#SOURCE_DIR="/volume1/exams24/2026/06-Червень"
 
 # Локальне сховище ZIP архівів
 ZIP_DIR="/volume1/exams_zip/${YEAR}/${MONTH_DIR}"
