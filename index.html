@@ -124,6 +124,8 @@
   .stat.errors .stat-value { color: #ef4444; }
   .stat.new    .stat-value { color: #38bdf8; }
 
+  .stat.text .stat-value { font-size: 1.1rem; }
+
   .last-run {
     font-size: 0.75rem;
     color: #475569;
@@ -168,6 +170,22 @@ function monthName(m) {
   return names[parseInt(m)] || m;
 }
 
+function fmtDuration(sec) {
+  if (sec === undefined || sec === null || isNaN(sec)) return "—";
+  sec = parseInt(sec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}г ${m}хв`;
+  if (m > 0) return `${m}хв ${s}с`;
+  return `${s}с`;
+}
+
+function fmtSize(gb) {
+  if (gb === undefined || gb === null || isNaN(gb)) return "—";
+  return `${parseFloat(gb).toFixed(2)} ГБ`;
+}
+
 function renderCard(data) {
   const status = data.status || "unknown";
   const period = data.year && data.month
@@ -197,6 +215,22 @@ function renderCard(data) {
         <div class="stat">
           <div class="stat-value">${data.skipped ?? "—"}</div>
           <div class="stat-label">Пропущено</div>
+        </div>
+        <div class="stat text">
+          <div class="stat-value">${fmtSize(data.archive_size_gb)}</div>
+          <div class="stat-label">Розмір архіву</div>
+        </div>
+        <div class="stat text">
+          <div class="stat-value">${fmtDuration(data.duration_sec)}</div>
+          <div class="stat-label">Тривалість</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">${data.workdir_files ?? "—"}</div>
+          <div class="stat-label">Файлів у робочому каталозі</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">${data.tower_files ?? "—"}</div>
+          <div class="stat-label">Файлів на Tower</div>
         </div>
       </div>
       <div class="last-run">Останній запуск: ${fmt(data.last_run)}</div>

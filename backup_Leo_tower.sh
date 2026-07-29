@@ -46,6 +46,8 @@ flock -n 9 || { echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] Скрипт вже з
 
 mkdir -p "$ZIP_DIR" "$LOG_DIR"
 
+START_TS=$(date +%s)
+
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [${1}] ${2}" | tee -a "$LOG_FILE"
 }
@@ -107,6 +109,17 @@ file_size() {
     stat -c%s "$1" 2>/dev/null || echo "0"
 }
 
+dir_size_gb() {
+    local bytes
+    bytes=$(du -sb "$1" 2>/dev/null | cut -f1)
+    [ -z "$bytes" ] && bytes=0
+    awk -v b="$bytes" 'BEGIN{printf "%.2f", b/1073741824}'
+}
+
+count_files() {
+    find "$1" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' '
+}
+
 is_folder_active() {
     find "$1" -type f -mmin -10 | grep -q .
 }
@@ -153,6 +166,7 @@ do_rsync() {
 
 write_status() {
     local run_status="$1" new="$2" retry="$3" skipped="$4" errors="$5"
+    local archive_size_gb="$6" duration_sec="$7" workdir_files="$8" tower_files="$9"
     mkdir -p "$(dirname "$STATUS_JSON")" 2>/dev/null
     cat > "$STATUS_JSON" <<EOF
 {
@@ -166,6 +180,10 @@ write_status() {
   "retry": ${retry},
   "skipped": ${skipped},
   "errors": ${errors},
+  "archive_size_gb": ${archive_size_gb},
+  "duration_sec": ${duration_sec},
+  "workdir_files": ${workdir_files},
+  "tower_files": ${tower_files},
   "last_run": "$(date '+%Y-%m-%d %H:%M:%S')"
 }
 EOF
@@ -263,10 +281,15 @@ log "INFO" "  Пропущено: $SKIP_COUNT"
 log "INFO" "  Помилок  : $ERROR_COUNT"
 log "INFO" "========================================================"
 
+ARCHIVE_SIZE_GB=$(dir_size_gb "$ZIP_DIR")
+DURATION_SEC=$(( $(date +%s) - START_TS ))
+WORKDIR_FILES=$(count_files "$ZIP_DIR")
+TOWER_FILES=$(count_files "$REMOTE_DIR")
+
 if [ $ERROR_COUNT -gt 0 ]; then
-    write_status "error" $NEW_COUNT $RETRY_COUNT $SKIP_COUNT $ERROR_COUNT
+    write_status "error" $NEW_COUNT $RETRY_COUNT $SKIP_COUNT $ERROR_COUNT "$ARCHIVE_SIZE_GB" "$DURATION_SEC" "$WORKDIR_FILES" "$TOWER_FILES"
     exit 1
 fi
 
-write_status "ok" $NEW_COUNT $RETRY_COUNT $SKIP_COUNT $ERROR_COUNT
+write_status "ok" $NEW_COUNT $RETRY_COUNT $SKIP_COUNT $ERROR_COUNT "$ARCHIVE_SIZE_GB" "$DURATION_SEC" "$WORKDIR_FILES" "$TOWER_FILES"
 exit 0
