@@ -57,6 +57,55 @@ is_mounted() {
     awk -v mp="$1" '$2==mp{found=1;exit} END{exit !found}' /proc/mounts
 }
 
+# Unraid спить (spin-down дисків) — після холодного старту масиву
+# NFS-шара (змонтована через DSM) може відповісти не одразу.
+# Легкий тич + коротка пауза, максимум ~10с, перед тим як здатись.
+wait_for_nfs() {
+    local mount_point="$1"
+    local i
+
+    if is_mounted "$mount_point"; then
+        return 0
+    fi
+
+    for i in 1 2; do
+        timeout 3 stat "$mount_point" >/dev/null 2>&1
+        sleep 3
+        if is_mounted "$mount_point"; then
+            log "INFO" "NFS з'явилась після короткого очікування"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+write_status() {
+    local run_status="$1" new="$2" retry="$3" skipped="$4" errors="$5"
+    local archive_size_gb="$6" duration_sec="$7" workdir_files="$8" tower_files="$9"
+    mkdir -p "$(dirname "$STATUS_JSON")" 2>/dev/null
+    cat > "$STATUS_JSON" <<EOF
+{
+  "clinic": "${CLINIC_NAME}",
+  "year": "${YEAR}",
+  "month": "${MONTH}",
+  "month_dir": "${MONTH_DIR}",
+  "target": "${TARGET}",
+  "status": "${run_status}",
+  "new": ${new},
+  "retry": ${retry},
+  "skipped": ${skipped},
+  "errors": ${errors},
+  "archive_size_gb": ${archive_size_gb},
+  "duration_sec": ${duration_sec},
+  "workdir_files": ${workdir_files},
+  "tower_files": ${tower_files},
+  "last_run": "$(date '+%Y-%m-%d %H:%M:%S')"
+}
+EOF
+    chmod 644 "$STATUS_JSON" 2>/dev/null
+}
+
 if [ ! -f "$CSV_FILE" ]; then
     echo "processed_at,year,month,patient_dir,zip_name,zip_size_bytes,rsync_remote_ok,rsync_usb_ok" > "$CSV_FILE"
 fi
@@ -73,7 +122,7 @@ fi
 DESTINATIONS_OK=true
 
 if [[ "$TARGET" == "remote" || "$TARGET" == "both" ]]; then
-    if ! is_mounted "$REMOTE_MOUNT"; then
+    if ! wait_for_nfs "$REMOTE_MOUNT"; then
         log "ERROR" "NFS не змонтована: $REMOTE_MOUNT"
         DESTINATIONS_OK=false
     elif mkdir -p "$REMOTE_DIR" 2>/dev/null; then
@@ -95,6 +144,7 @@ fi
 
 if [ "$DESTINATIONS_OK" = false ]; then
     log "ERROR" "Не всі призначення доступні. Зупинено."
+    write_status "error" 0 0 0 1 "0" "$(( $(date +%s) - START_TS ))" 0 0
     exit 1
 fi
 
@@ -143,7 +193,7 @@ do_rsync() {
     local zip_name
     zip_name=$(basename "$zip_path")
 
-    if [[ "$label" == "Remote" ]] && ! is_mounted "$REMOTE_MOUNT"; then
+    if [[ "$label" == "Remote" ]] && ! wait_for_nfs "$REMOTE_MOUNT"; then
         log "ERROR" "Rsync FAILED (${label}): NFS відвалилась"
         return 1
     fi
@@ -163,32 +213,6 @@ do_rsync() {
         log "ERROR" "Rsync FAILED (${label}): $zip_name"
         return 1
     fi
-}
-
-write_status() {
-    local run_status="$1" new="$2" retry="$3" skipped="$4" errors="$5"
-    local archive_size_gb="$6" duration_sec="$7" workdir_files="$8" tower_files="$9"
-    mkdir -p "$(dirname "$STATUS_JSON")" 2>/dev/null
-    cat > "$STATUS_JSON" <<EOF
-{
-  "clinic": "${CLINIC_NAME}",
-  "year": "${YEAR}",
-  "month": "${MONTH}",
-  "month_dir": "${MONTH_DIR}",
-  "target": "${TARGET}",
-  "status": "${run_status}",
-  "new": ${new},
-  "retry": ${retry},
-  "skipped": ${skipped},
-  "errors": ${errors},
-  "archive_size_gb": ${archive_size_gb},
-  "duration_sec": ${duration_sec},
-  "workdir_files": ${workdir_files},
-  "tower_files": ${tower_files},
-  "last_run": "$(date '+%Y-%m-%d %H:%M:%S')"
-}
-EOF
-    chmod 644 "$STATUS_JSON" 2>/dev/null
 }
 
 process_patient() {
