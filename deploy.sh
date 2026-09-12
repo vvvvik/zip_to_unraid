@@ -18,9 +18,9 @@ echo "== git pull =="
 git pull
 
 echo "== MA + SuperHumans -> $MA_HOST =="
-scp backup_MA_tower.sh backup_SuperHumans_tower.sh "${MA_HOST}:${REMOTE_PATH}"
+scp -O backup_MA_tower.sh backup_SuperHumans_tower.sh "${MA_HOST}:${REMOTE_PATH}"
 
 echo "== Leo -> $LEO_HOST =="
-scp backup_Leo_tower.sh "${LEO_HOST}:${REMOTE_PATH}"
+scp -O backup_Leo_tower.sh "${LEO_HOST}:${REMOTE_PATH}"
 
 echo "Готово."
