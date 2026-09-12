@@ -9,9 +9,9 @@
 # =============================================================================
 
 YEAR="2026"
-MONTH="07"
-MONTH_DIR="07-Липень"     # назва папки в SuperHumans (джерело)
-ZIP_MONTH_DIR="07-mis"    # назва папки в exams_zip і на Unraid
+MONTH="09"
+MONTH_DIR="09-Вересень"     # назва папки в SuperHumans (джерело)
+ZIP_MONTH_DIR="09-mis"    # назва папки в exams_zip і на Unraid
 
 # =============================================================================
 # НАЛАШТУВАННЯ КЛІНІКИ (не чіпати)
@@ -23,7 +23,7 @@ CLINIC_NAME="SuperHumans"
 # remote  = тільки Unraid
 # usb     = тільки USB диск
 # both    = Unraid + USB
-TARGET="remote"
+TARGET="both"
 
 ZIP_LEVEL=2
 
