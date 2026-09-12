@@ -35,7 +35,7 @@ STATUS_JSON="${REMOTE_MOUNT}/status/${CLINIC_NAME}.json"
 
 LOG_DIR="/volume1/scripts/log"
 LOG_FILE="${LOG_DIR}/backup_${CLINIC_NAME}_${YEAR}_${MONTH}.log"
-CSV_FILE="${LOG_DIR}/processed_${YEAR}_${MONTH}.csv"
+CSV_FILE="${LOG_DIR}/processed_${CLINIC_NAME}_${YEAR}_${MONTH}.csv"
 
 # =============================================================================
 # ІНІЦІАЛІЗАЦІЯ
